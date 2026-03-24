@@ -5,154 +5,78 @@ public class BookMyStayApp {
 
   public static void main(String[] args) {
 
-    // ---------------- Room Data ----------------
-    Map<String, Room> roomData = new HashMap<>();
-    roomData.put("DELUXE", new Room("DELUXE", 2000, "AC, WiFi, TV"));
-    roomData.put("SUITE", new Room("SUITE", 5000, "AC, WiFi, TV, Jacuzzi"));
-    roomData.put("STANDARD", new Room("STANDARD", 1000, "Fan, TV"));
+    // ---------------- Booking Request Queue ----------------
+    BookingRequestQueue requestQueue = new BookingRequestQueue();
 
-    RoomRepository roomRepo = new RoomRepository(roomData);
+    // ---------------- Simulating Guest Requests ----------------
+    requestQueue.addRequest(new Reservation("User1", "DELUXE"));
+    requestQueue.addRequest(new Reservation("User2", "SUITE"));
+    requestQueue.addRequest(new Reservation("User3", "DELUXE"));
+    requestQueue.addRequest(new Reservation("User4", "STANDARD"));
 
-    // ---------------- Inventory Data ----------------
-    Map<String, Integer> inventoryData = new HashMap<>();
-    inventoryData.put("DELUXE", 3);
-    inventoryData.put("SUITE", 0); // Will be filtered out
-    inventoryData.put("STANDARD", 5);
+    // ---------------- Display Queue ----------------
+    System.out.println("\n--- Booking Requests in FIFO Order ---");
+    requestQueue.displayQueue();
 
-    Inventory inventory = new Inventory(inventoryData);
-
-    // ---------------- Search Service ----------------
-    SearchService searchService = new SearchService(inventory, roomRepo);
-
-    // ---------------- Execute Search ----------------
-    List<RoomResult> results = searchService.searchAvailableRooms();
-
-    // ---------------- Display Results ----------------
-    System.out.println("Available Rooms:");
-    for (RoomResult result : results) {
-      System.out.println(result);
-    }
+    // NOTE:
+    // No allocation or inventory update happens here
+    // This stage ONLY collects and orders requests
   }
 }
 
-// ---------------- Domain Model ----------------
-class Room {
+// ---------------- Reservation (Actor Model) ----------------
+class Reservation {
+  private final String userId;
   private final String roomType;
-  private final double price;
-  private final String amenities;
 
-  public Room(String roomType, double price, String amenities) {
+  public Reservation(String userId, String roomType) {
+    this.userId = userId;
     this.roomType = roomType;
-    this.price = price;
-    this.amenities = amenities;
+  }
+
+  public String getUserId() {
+    return userId;
   }
 
   public String getRoomType() {
     return roomType;
   }
 
-  public double getPrice() {
-    return price;
-  }
-
-  public String getAmenities() {
-    return amenities;
-  }
-}
-
-// ---------------- Inventory (Read-Only) ----------------
-class Inventory {
-  private final Map<String, Integer> availabilityMap;
-
-  public Inventory(Map<String, Integer> availabilityMap) {
-    this.availabilityMap = availabilityMap;
-  }
-
-  public int getAvailability(String roomType) {
-    return availabilityMap.getOrDefault(roomType, 0);
-  }
-
-  public Map<String, Integer> getAllAvailability() {
-    return availabilityMap; // No mutation performed
-  }
-}
-
-// ---------------- Repository ----------------
-class RoomRepository {
-  private final Map<String, Room> roomMap;
-
-  public RoomRepository(Map<String, Room> roomMap) {
-    this.roomMap = roomMap;
-  }
-
-  public Room getRoomByType(String roomType) {
-    return roomMap.get(roomType);
-  }
-}
-
-// ---------------- DTO ----------------
-class RoomResult {
-  private final String roomType;
-  private final double price;
-  private final String amenities;
-  private final int availableCount;
-
-  public RoomResult(String roomType, double price, String amenities, int availableCount) {
-    this.roomType = roomType;
-    this.price = price;
-    this.amenities = amenities;
-    this.availableCount = availableCount;
-  }
-
   @Override
   public String toString() {
-    return "Room Type: " + roomType +
-            ", Price: ₹" + price +
-            ", Amenities: " + amenities +
-            ", Available: " + availableCount;
+    return "User: " + userId + ", Room Type: " + roomType;
   }
 }
 
-// ---------------- Search Service (Read-Only Logic) ----------------
-class SearchService {
+// ---------------- Booking Request Queue ----------------
+class BookingRequestQueue {
 
-  private final Inventory inventory;
-  private final RoomRepository roomRepository;
+  private final Queue<Reservation> queue;
 
-  public SearchService(Inventory inventory, RoomRepository roomRepository) {
-    this.inventory = inventory;
-    this.roomRepository = roomRepository;
+  public BookingRequestQueue() {
+    this.queue = new LinkedList<>();
   }
 
-  public List<RoomResult> searchAvailableRooms() {
-    List<RoomResult> results = new ArrayList<>();
+  // Add request (FIFO insertion)
+  public void addRequest(Reservation reservation) {
+    queue.offer(reservation);
+    System.out.println("Request added: " + reservation);
+  }
 
-    Map<String, Integer> availabilityMap = inventory.getAllAvailability();
+  // Retrieve next request (used later by allocation system)
+  public Reservation getNextRequest() {
+    return queue.poll();
+  }
 
-    for (Map.Entry<String, Integer> entry : availabilityMap.entrySet()) {
-      String roomType = entry.getKey();
-      int availableCount = entry.getValue();
-
-      // Defensive check: skip unavailable rooms
-      if (availableCount <= 0) {
-        continue;
-      }
-
-      Room room = roomRepository.getRoomByType(roomType);
-
-      // Safety check: skip if room definition missing
-      if (room == null) {
-        continue;
-      }
-
-      results.add(new RoomResult(
-              room.getRoomType(),
-              room.getPrice(),
-              room.getAmenities(),
-              availableCount
-      ));
+  // View all queued requests (without removing)
+  public void displayQueue() {
+    for (Reservation r : queue) {
+      System.out.println(r);
     }
+  }
 
-    return results;
+  // Check if queue is empty
+  public boolean isEmpty() {
+    return queue.isEmpty();
   }
 }
